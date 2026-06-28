@@ -1,34 +1,35 @@
-# calixto-omnisystem-architecture
-
 🛠️ Engenharia de Software e Padrões de Projeto
-1. Padrão Singleton (Gerenciamento de Conexões)
-Em aplicações baseadas em WebSockets, o vazamento de conexões é o caminho mais rápido para derrubar um servidor. Para evitar o esgotamento do Connection Pool do banco de dados e picos de RAM, o Calixto OmniSystem aplica estritamente o Design Pattern Singleton.
+1. Gerenciamento de Conexões (Padrão Singleton)
+Prevenção contra o esgotamento do Connection Pool e picos de RAM em WebSockets:
 
-Prisma Client: Instanciado uma única vez globalmente.
+Prisma Client: Instanciado em uma única conexão global.
 
-WhatsApp Gateway (Baileys): O túnel de comunicação é único e reaproveitado por todos os módulos da aplicação, evitando múltiplas autenticações simultâneas.
+WhatsApp Gateway (Baileys): Túnel de comunicação reaproveitado em toda a aplicação, barrando múltiplas autenticações simultâneas.
 
-2. Infraestrutura e Autocura (Self-Healing)
-A aplicação não depende de execuções manuais. Em produção, o sistema é orquestrado pelo PM2 (Process Manager).
+2. Orquestração e Autocura (Self-Healing)
+A aplicação opera de forma autônoma e resiliente via PM2:
 
-Self-Healing: Caso ocorra uma queda abrupta de rede ou um erro fatal de thread, o PM2 reinicia o Kernel automaticamente em milissegundos, garantindo que o SaaS mantenha uma altíssima taxa de Uptime e zero Downtime percebido pelas clínicas.
+Zero Downtime: Em caso de falha de rede ou queda de thread, o Kernel é reiniciado instantaneamente em milissegundos, mantendo o sistema da clínica online.
 
-3. Gerenciamento de Estado e Prevenção de Vazamento (Memory Leaks)
-Como o estado das conversas roda em memória RAM (Redis) para garantir baixa latência (Fast-Path), criei duas travas de segurança:
+3. Estado e Prevenção de Vazamentos (Redis)
+Controle rigoroso do estado das conversas hospedado na memória RAM (Fast-Path):
 
-Cache Prevention: A cada nova interação do usuário, o estado anterior é cirurgicamente invalidado. Isso previne o Stale Data (dados velhos), garantindo que o bot nunca fique preso em um loop ou retorne respostas desatualizadas.
+Cache Prevention: Invalidação cirúrgica de estados anteriores a cada interação do usuário, prevenindo respostas desatualizadas (Stale Data).
 
-Watchdog de Memória (Short Polling): Um serviço de Garbage Collection operando em background. A cada 5 segundos, ele executa um Short Polling no Redis. Se identificar que um usuário abandonou a conversa no meio do fluxo, o Watchdog "mata" a sessão ociosa, devolvendo a memória RAM para o servidor.
+Watchdog (Short Polling): Motor de Garbage Collection operando a cada 5 segundos. Sessões abandonadas no meio do fluxo são destruídas, prevenindo Memory Leaks.
 
 4. Segurança e Resiliência
-Para expor a aplicação em um ambiente público de forma segura, a infraestrutura conta com middlewares de proteção pesada:
+Infraestrutura blindada para exposição segura ao ambiente público:
 
-Helmet.js: Blindagem de cabeçalhos HTTP, ocultando a stack tecnológica de varreduras maliciosas.
+Helmet.js: Ocultação da stack Node.js e proteção de cabeçalhos HTTP.
 
-Rate Limiting: Trava contra ataques de Força Bruta e DDoS na camada de rede.
+Rate Limiting: Bloqueio ativo contra ataques DDoS e Força Bruta.
 
-Sanitização Rigorosa: Todos os inputs vindos do WhatsApp passam por limpadores de strings e regex para impedir ataques de injeção (XSS/SQLi) antes de tocarem na lógica de negócios.
+Sanitização de Inputs: Filtros Regex rigorosos nas mensagens recebidas para neutralizar injeções de código (XSS/SQLi).
 
-5. Decisão de Negócio: Lógica Determinística vs. IA Generativa
-Uma das decisões arquiteturais mais importantes deste projeto foi não utilizar Inteligência Artificial Generativa (LLMs) para formular as respostas aos pacientes. O ecossistema de saúde e agendamentos médicos exige previsibilidade absoluta e não tolera "alucinações" de IA.
-Por isso, todo o sistema de PNL (Processamento de Linguagem Natural) foi construído em cima de lógica determinística, fluxos estruturados e Fuzzy Matching, garantindo 100% de precisão e controle sobre a jornada do cliente.
+5. Motor de Decisão: Lógica Determinística
+O sistema não utiliza Inteligência Artificial para responder aos clientes, priorizando a segurança do paciente:
+
+100% de Precisão: Eliminação de "alucinações" de IA no agendamento médico.
+
+Controle Absoluto: O roteamento e o processamento de linguagem operam exclusivamente via fluxos lógicos pré-programados e Fuzzy Matching.
